@@ -120,3 +120,8 @@ dev.off()
 #====
 format(object.size(object),unit = "GB")
 saveRDS(object, file = "data/Macrophages_5_20211112.rds")
+
+
+write.xlsx(x = df_samples, file = paste0(path,"test.xlsx"),
+           colNames = TRUE, borders = "surrounding")
+           

@@ -39,10 +39,10 @@ meta.data %<>% tibble::column_to_rownames(var = "sample_name")
 
 human_brain <- SingleCellExperiment(list(logcounts=Logcounts),
                                     colData=DataFrame(meta.data))
-human_brain = subset(human_brain, , subclass_label !="")
+human_brain = subset(human_brain, subclass_label !="")
 head(rownames(human_brain))
 saveRDS(object = human_brain, file = "../seurat_resources/azimuth/human_primary_motorcortex/human_brain.rds")
-
+#human_brain = readRDS(file = "../seurat_resources/azimuth/human_primary_motorcortex/human_brain.rds")
 # ====== load blue_encode reference =============
 blue_encode <- BlueprintEncodeData()
 head(rownames(blue_encode))
@@ -53,6 +53,9 @@ length(common)
 table(blue_encode$label.fine)
 system.time(trained <- trainSingleR(ref = blue_encode[common,],
                                     labels=blue_encode$label.fine))
+system.time(pred <- classifySingleR(sce[common,], trained))
+saveRDS(object = pred, file = "output/Macrophages_5_20211112_singleR_pred.rds")
+
 #=========================
 common <- Reduce(intersect, list(rownames(sce),
                                  rownames(human_brain)
