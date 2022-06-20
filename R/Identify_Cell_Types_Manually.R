@@ -26,6 +26,12 @@ object@meta.data = readRDS(file = "shinyApp/Human_brain/meta_data.rds")
 GeneSets = read.csv("doc/Gene lists for gene set enrichments.csv")
 GeneSets %<>% df2list
 
+
+GeneSets1 = read.csv("doc/Gene lists for gene set enrichments_5.csv")
+colnames(GeneSets1) %<>% gsub("X([1-9][0-9])_|X([1-9])_","",.)
+
+GeneSets1 %<>% df2list
+GeneSets %<>% c(GeneSets1)
 httr::set_config(httr::config(ssl_verifypeer = FALSE))
 human = biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 mouse = biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
@@ -48,7 +54,7 @@ for(i in which(!names(GeneSets) %in% colnames(object@meta.data))){
                                         names(GeneSets)[i],.)
 }
 
-for(i in 11:13){
+for(i in which(!paste0(names(GeneSets),".pos") %in% colnames(object@meta.data))){
     object@meta.data[,paste0(names(GeneSets)[i],".pos")] = object@meta.data[,names(GeneSets)[i]] -min(object@meta.data[,names(GeneSets)[i]])
 }
 
@@ -123,3 +129,14 @@ for(i in 1:length(resolutions)){
 
 saveRDS(meta.data, file = "shinyApp/Human_brain/meta_data.rds")
 
+#========
+meta.data = readRDS(file = "shinyApp/Human_brain/meta_data.rds")
+meta.data %<>% subset(Doublets == "Singlet")
+meta.data = meta.data[,c("label.human_brain.v2","label.human_brain",
+                           "orig.ident","patient",
+                           paste0("SCT_snn_res.",c(0.01,0.1,seq( 0.2, 2, 0.2))),
+                           paste0("integrated_snn_res.",c(0.01,0.1,seq( 0.2, 2, 0.2))))]
+meta.data %<>% cbind(gsub(".*-","",rownames(meta.data)),.)
+colnames(meta.data)[1] = "barcode"
+
+data.table::fwrite(meta.data,"shinyApp/Human_brain/meta_data.csv")
