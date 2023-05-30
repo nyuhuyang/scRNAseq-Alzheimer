@@ -3,7 +3,7 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(magrittr)
-source("https://raw.githubusercontent.com/nyuhuyang/SeuratExtra/master/R/Seurat3_functions.R")
+source("https://raw.githubusercontent.com/nyuhuyang/SeuratExtra/master/R/Seurat4_functions.R")
 path <- paste0("output/",gsub("-","",Sys.Date()),"/")
 if(!dir.exists(path))dir.create(path, recursive = T)
 
@@ -19,7 +19,7 @@ object@meta.data[Microglia_1,"label.human_brain"] = "Microglia 1"
 object@meta.data[Microglia_2,"label.human_brain"] = "Microglia 2"
 object@meta.data[Microglia_3,"label.human_brain"] = "Microglia 3"
 
-#========= pathway ======
+#========= pathway v1 ======
 object <- readRDS("data/Macrophages_5_20211112.rds")
 object@meta.data = readRDS(file = "shinyApp/Human_brain/meta_data.rds")
 
@@ -57,6 +57,84 @@ for(i in which(!names(GeneSets) %in% colnames(object@meta.data))){
 for(i in which(!paste0(names(GeneSets),".pos") %in% colnames(object@meta.data))){
     object@meta.data[,paste0(names(GeneSets)[i],".pos")] = object@meta.data[,names(GeneSets)[i]] -min(object@meta.data[,names(GeneSets)[i]])
 }
+saveRDS(file = "shinyApp/Human_brain/meta_data.rds")
+#========= pathway v2 ======
+object <- readRDS("data/Macrophages_5_20211112.rds")
+meta.data = readRDS(file = "shinyApp/Human_brain/meta_data.rds")
+old.pathways.names = grep("HALLMARK|KEGG|Human_AD|Mouse_DAM",colnames(meta.data),value = T)
+old.pathways.names = grep("KEGG_NDD$|KEGG_NDD.pos",old.pathways.names,value = T,invert = T)
+meta.data = meta.data[,-which(colnames(meta.data) %in% old.pathways.names )]
+object@meta.data = meta.data
+
+GeneSets = read.csv("doc/Gene lists for gene set enrichments_7.csv")
+colnames(GeneSets) %<>% gsub("X([1-9][0-9]).|X([1-9]).","",.)
+
+GeneSets %<>% df2list
+
+mouse_human_genes = read.csv("http://www.informatics.jax.org/downloads/reports/HOM_MouseHumanSequence.rpt",sep="\t")
+mouse2human <- function(gene_list){
+#https://stackoverflow.com/questions/60032266/internal-server-errors-when-querying-biomart
+    output = c()
+    
+    for(gene in gene_list){
+        class_key = (mouse_human_genes %>% filter(Symbol == gene & Common.Organism.Name=="mouse, laboratory"))[['DB.Class.Key']]
+        if(!identical(class_key, integer(0)) ){
+            human_genes = (mouse_human_genes %>% filter(DB.Class.Key == class_key & Common.Organism.Name=="human"))[,"Symbol"]
+            for(human_gene in human_genes){
+                output = append(output,human_gene)
+            }
+        }
+    }
+    
+    return (output)
+}
+GeneSets[["Mouse_DAM"]] = mouse2human(GeneSets[["Mouse_DAM"]])
+table(GeneSets[["Mouse_DAM"]]  %in% rownames(object))
+names(GeneSets)[!names(GeneSets) %in% colnames(object@meta.data)]
+
+for(i in which(!names(GeneSets) %in% colnames(object@meta.data))){
+    print(names(GeneSets)[i])
+    object %<>% AddModuleScore(features = GeneSets[i],
+                               name = names(GeneSets)[i])
+    colnames(object@meta.data) %<>% sub(paste0(names(GeneSets)[i],"1"),
+                                        names(GeneSets)[i],.)
+}
+for(i in which(!paste0(names(GeneSets),".pos") %in% colnames(object@meta.data))){
+    object@meta.data[,paste0(names(GeneSets)[i],".pos")] = object@meta.data[,names(GeneSets)[i]] -min(object@meta.data[,names(GeneSets)[i]])
+}
+saveRDS(object@meta.data, file = "output/Macrophages_5_20211112_meta.data_v2.rds")
+
+#=========Gene lists for gene set enrichments_9 ===========
+GeneSets = read.csv("doc/Gene lists for gene set enrichments_7.csv")
+colnames(GeneSets) %<>% gsub("X([1-9][0-9]).|X([1-9]).","",.)
+
+GeneSets %<>% lapply(function(x) x[!x == ""])
+
+GeneSets1 <- readxl::read_excel("doc/Gene lists for gene set enrichments_9.xlsx") %>% df2list
+names(GeneSets1) %<>% gsub(" ",".",.)
+GeneSets = c(GeneSets,GeneSets1)
+GeneSetsNames = c("KEGG_NDD",names(GeneSets))
+
+
+meta.data = readRDS(file = "output/Macrophages_5_20211112_meta.data_v2.rds")
+if(all(colnames(object) == rownames(meta.data))){
+    object@meta.data = meta.data
+    print("All cellID match!")
+}
+
+for(i in which(!names(GeneSets) %in% colnames(object@meta.data))){
+    print(names(GeneSets)[i])
+    object %<>% AddModuleScore(features = GeneSets[i],
+                               name = names(GeneSets)[i])
+    colnames(object@meta.data) %<>% sub(paste0(names(GeneSets)[i],"1"),
+                                        names(GeneSets)[i],.)
+}
+
+for(i in which(!paste0(names(GeneSets),".pos") %in% colnames(object@meta.data))){
+    object@meta.data[,paste0(names(GeneSets)[i],".pos")] = object@meta.data[,names(GeneSets)[i]] -min(object@meta.data[,names(GeneSets)[i]])
+}
+saveRDS(object@meta.data, file = "output/Macrophages_5_20211112_meta.data_v3.rds")
+
 
 #============ cnv =================
 meta.data = read.csv("shinyApp/Human_brain/cnv_meta_data.csv",row.names = 1)
